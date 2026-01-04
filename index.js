@@ -5,29 +5,22 @@ const express = require('express');
 
 // --- إعداد سيرفر الويب لـ Render ---
 const app = express();
-const port = process.env.PORT || 10000; // Render يفضل المنفذ 10000
-app.get('/', (req, res) => res.send('القرين يعمل في السحاب! 🚀'));
+const port = process.env.PORT || 10000; 
+app.get('/', (req, res) => res.send('البوت يعمل بنجاح! 🚀'));
 app.listen(port, () => console.log(`سيرفر الويب جاهز على منفذ ${port}`));
 
-// 1. رابط جوجل سكربت الخاص بك (تم الحفاظ عليه كما هو)
+// 1. رابط جوجل سكربت الخاص بك
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxc6igVkJQBVocNljKrSLQuUERsl42yPegIeBvqkg_pzThii8Bt49lyHCng8bPzhIzKRQ/exec";
 
+// 2. إعداد العميل (بدون مسار يدوي ليتوافق مع Docker)
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        // تم تعديل هذا الجزء ليعمل على لينكس (Render) وويندوز تلقائياً
-        executablePath: process.platform === 'win32' 
-            ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' 
-            : '/usr/bin/google-chrome-stable',
         headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
             '--disable-gpu'
         ]
     }
@@ -35,16 +28,16 @@ const client = new Client({
 
 // إظهار الـ QR Code في الـ Logs
 client.on('qr', (qr) => {
-    console.log('--- امسح الكود التالي من سجلات السيرفر ---');
+    console.log('--- امسح الكود التالي عبر واتساب ---');
     qrcode.generate(qr, { small: true });
 });
 
-// عند الاتصال
+// عند الاتصال بنجاح
 client.on('ready', () => {
-    console.log('✅ القرين متصل الآن وجاهز للاستخدام من السيرفر!');
+    console.log('✅ تم الاتصال! البوت جاهز لاستقبال الرسائل وإرسالها لجوجل شيت.');
 });
 
-// معالجة الرسائل وإرسالها لجوجل شيت
+// معالجة الرسائل
 client.on('message_create', async (msg) => {
     
     // ميزة القالب
@@ -72,17 +65,15 @@ client.on('message_create', async (msg) => {
                 rawDataText = `${shopName} \n عليكم = ${priceValue} \n العملية = ${actionValue} \n الموديل = ${modelValue}`;
             }
 
-            console.log(`📡 التقطت رسالة: [${shopName}] | جاري الإرسال لـ Google Sheets...`);
+            console.log(`📡 التقطت رسالة من [${shopName}] | جاري الإرسال لجوجل...`);
 
             try {
                 const response = await axios.post(GOOGLE_SCRIPT_URL, rawDataText, {
                     headers: { 'Content-Type': 'text/plain' }
                 });
-                
                 console.log('🚀 رد جوجل:', response.data);
-
             } catch (err) {
-                console.error('❌ خطأ في الإرسال لجوجل:', err.message);
+                console.error('❌ خطأ في الإرسال:', err.message);
             }
         }
     }

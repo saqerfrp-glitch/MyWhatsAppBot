@@ -12,9 +12,10 @@ app.listen(port, () => console.log(`سيرفر الويب يعمل على الم
 // 1. رابط جوجل سكربت الخاص بك
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxc6igVkJQBVocNljKrSLQuUERsl42yPegIeBvqkg_pzThii8Bt49lyHCng8bPzhIzKRQ/exec";
 
-// 2. إعداد العميل مع هوية متصفح حديثة لتفادي "فشل الربط"
+// 2. إعداد العميل مع زيادة وقت الانتظار لمنع التحديث السريع
 const client = new Client({
     authStrategy: new LocalAuth(),
+    authTimeoutMs: 60000, // زيادة وقت الانتظار لـ 60 ثانية لمنع فشل الربط
     puppeteer: {
         headless: true,
         args: [
@@ -25,25 +26,27 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--single-process',
-            '--disable-gpu',
-            '--disable-canvas-aa',
-            '--disable-2d-canvas-clip-aa',
-            '--disable-gl-drawing-for-tests'
+            '--disable-gpu'
         ],
-        // تم تحديث الهوية لتبدو كمتصفح كروم حقيقي على ويندوز 10
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
 });
 
-// إظهار الـ QR Code في الـ Logs
+// متغير لمراقبة عدد مرات ظهور الكود
+let qrCount = 0;
+
 client.on('qr', (qr) => {
-    console.log('--- جاري إنشاء كود QR جديد... امسحه الآن ---');
-    qrcode.generate(qr, { small: true });
+    qrCount++;
+    // إذا تكرر الكود بسرعة، نظهر فقط الأكواد الأولى لإعطاء فرصة للمعالجة
+    if (qrCount % 2 === 0) { 
+        console.log(`--- امسح الكود الآن (محاولة رقم ${qrCount}) ---`);
+        qrcode.generate(qr, { small: true });
+    }
 });
 
 // عند الاتصال بنجاح
 client.on('ready', () => {
-    console.log('✅ ممتاز! تم الربط بنجاح والبوت متصل الآن.');
+    console.log('✅ ممتاز يا حب! تم الربط بنجاح والبوت متصل الآن.');
 });
 
 // معالجة الرسائل وإرسالها لجوجل شيت

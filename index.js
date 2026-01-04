@@ -6,13 +6,13 @@ const express = require('express');
 // --- إعداد سيرفر الويب لـ Render ---
 const app = express();
 const port = process.env.PORT || 10000; 
-app.get('/', (req, res) => res.send('البوت يعمل بنجاح وهو الآن متصل بالسحاب! 🚀'));
-app.listen(port, () => console.log(`سيرفر الويب جاهز على منفذ ${port}`));
+app.get('/', (req, res) => res.send('البوت مستيقظ وجاهز للعمل! 🚀'));
+app.listen(port, () => console.log(`سيرفر الويب يعمل على المنفذ ${port}`));
 
 // 1. رابط جوجل سكربت الخاص بك
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxc6igVkJQBVocNljKrSLQuUERsl42yPegIeBvqkg_pzThii8Bt49lyHCng8bPzhIzKRQ/exec";
 
-// 2. إعداد العميل مع إعدادات المتصفح الوهمي (User Agent)
+// 2. إعداد العميل مع هوية متصفح حديثة لتفادي "فشل الربط"
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -21,29 +21,32 @@ const client = new Client({
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--disable-setuid-sandbox',
+            '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--single-process'
+            '--single-process',
+            '--disable-gpu',
+            '--disable-canvas-aa',
+            '--disable-2d-canvas-clip-aa',
+            '--disable-gl-drawing-for-tests'
         ],
-        // هذا السطر مهم جداً ليوهم واتساب بأنه متصفح حقيقي وليس بوت
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36'
+        // تم تحديث الهوية لتبدو كمتصفح كروم حقيقي على ويندوز 10
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
 });
 
 // إظهار الـ QR Code في الـ Logs
 client.on('qr', (qr) => {
-    console.log('--- امسح الكود التالي عبر واتساب (تأكد من تحديث الصفحة إذا لم يعمل) ---');
+    console.log('--- جاري إنشاء كود QR جديد... امسحه الآن ---');
     qrcode.generate(qr, { small: true });
 });
 
 // عند الاتصال بنجاح
 client.on('ready', () => {
-    console.log('✅ تم الاتصال بنجاح! البوت الآن جاهز للعمل 24/7.');
+    console.log('✅ ممتاز! تم الربط بنجاح والبوت متصل الآن.');
 });
 
-// معالجة الرسائل
+// معالجة الرسائل وإرسالها لجوجل شيت
 client.on('message_create', async (msg) => {
     
     // ميزة القالب
@@ -71,15 +74,15 @@ client.on('message_create', async (msg) => {
                 rawDataText = `${shopName} \n عليكم = ${priceValue} \n العملية = ${actionValue} \n الموديل = ${modelValue}`;
             }
 
-            console.log(`📡 التقطت رسالة: [${shopName}] | جاري الإرسال لجوجل شيت...`);
+            console.log(`📡 جاري إرسال بيانات [${shopName}] إلى جوجل شيت...`);
 
             try {
                 const response = await axios.post(GOOGLE_SCRIPT_URL, rawDataText, {
                     headers: { 'Content-Type': 'text/plain' }
                 });
-                console.log('🚀 رد جوجل:', response.data);
+                console.log('🚀 تم التسجيل في جوجل:', response.data);
             } catch (err) {
-                console.error('❌ خطأ في الإرسال لجوجل:', err.message);
+                console.error('❌ خطأ في الإرسال:', err.message);
             }
         }
     }

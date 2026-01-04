@@ -1,18 +1,15 @@
 {
   "name": "mywhatsappbot",
   "version": "1.0.0",
-  "description": "",
+  "description": "WhatsApp Bot for Google Sheets",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "axios": "^1.13.2",
+    "express": "^4.18.2",
     "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.34.2"
+    "whatsapp-web.js": "^1.26.0"
   }
 }

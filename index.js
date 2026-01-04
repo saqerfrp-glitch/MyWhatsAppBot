@@ -9,50 +9,40 @@ const port = process.env.PORT || 10000;
 app.get('/', (req, res) => res.send('البوت مستيقظ وجاهز للعمل! 🚀'));
 app.listen(port, () => console.log(`سيرفر الويب يعمل على المنفذ ${port}`));
 
-// 1. رابط جوجل سكربت الخاص بك
+// 1. رابط جوجل سكربت (تأكد من تحديثه إذا حصلت على رابط جديد بعد الـ Deploy)
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxc6igVkJQBVocNljKrSLQuUERsl42yPegIeBvqkg_pzThii8Bt49lyHCng8bPzhIzKRQ/exec";
 
-// 2. إعداد العميل مع زيادة وقت الانتظار لمنع التحديث السريع
+// 2. إعداد العميل
 const client = new Client({
     authStrategy: new LocalAuth(),
-    authTimeoutMs: 60000, // زيادة وقت الانتظار لـ 60 ثانية لمنع فشل الربط
+    authTimeoutMs: 60000, 
     puppeteer: {
         headless: true,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
             '--disable-gpu'
         ],
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
 });
 
-// متغير لمراقبة عدد مرات ظهور الكود
-let qrCount = 0;
-
+// إظهار الـ QR Code
 client.on('qr', (qr) => {
-    qrCount++;
-    // إذا تكرر الكود بسرعة، نظهر فقط الأكواد الأولى لإعطاء فرصة للمعالجة
-    if (qrCount % 2 === 0) { 
-        console.log(`--- امسح الكود الآن (محاولة رقم ${qrCount}) ---`);
-        qrcode.generate(qr, { small: true });
-    }
+    console.log('--- امسح الكود الجديد ---');
+    qrcode.generate(qr, { small: true });
 });
 
 // عند الاتصال بنجاح
 client.on('ready', () => {
-    console.log('✅ ممتاز يا حب! تم الربط بنجاح والبوت متصل الآن.');
+    console.log('✅ م تم الربط بنجاح والبوت متصل الآن.');
 });
 
-// معالجة الرسائل وإرسالها لجوجل شيت
+// معالجة الرسائل وإرسالها لجوجل شيت (نفس نظام الكروم)
 client.on('message_create', async (msg) => {
     
-    // ميزة القالب
+    // رد تلقائي للقالب
     if (msg.body === 'قالب' || msg.body === 'القالب') {
         msg.reply('القمة للجوال-المبلغ-العملية-الموديل');
         return;
@@ -62,30 +52,35 @@ client.on('message_create', async (msg) => {
     if (msg.body.includes('-')) {
         let parts = msg.body.split('-');
         
+        // التأكد أن الرسالة تحتوي على الأجزاء المطلوبة
         if (parts.length >= 3) {
-            let shopName = parts[0].trim();
-            let priceValue = parts[1].trim();
-            let actionValue = parts[2].trim();
-            let modelValue = parts[3] ? parts[3].trim() : ""; 
             
-            let rawDataText = "";
+            // إرسال الرسالة كاملة كما هي (مثل نظام الكروم)
+            let rawDataText = msg.body; 
 
-            if (actionValue.includes("لكم")) {
-                rawDataText = `${shopName} \n لكم عملية == ${actionValue} \n السعر == ${priceValue}`;
-            } 
-            else {
-                rawDataText = `${shopName} \n عليكم = ${priceValue} \n العملية = ${actionValue} \n الموديل = ${modelValue}`;
-            }
-
-            console.log(`📡 جاري إرسال بيانات [${shopName}] إلى جوجل شيت...`);
+            console.log(`📡 جاري إرسال النص: [${rawDataText}] إلى جوجل شيت...`);
 
             try {
                 const response = await axios.post(GOOGLE_SCRIPT_URL, rawDataText, {
                     headers: { 'Content-Type': 'text/plain' }
                 });
-                console.log('🚀 تم التسجيل في جوجل:', response.data);
+                
+                // طباعة رد جوجل لمعرفة النتيجة
+                console.log('🚀 رد جوجل:', response.data);
+                
+                if (response.data.includes("success")) {
+                    console.log("✅ تمت العملية بنجاح في الشيت.");
+                }
+
             } catch (err) {
-                console.error('❌ خطأ في الإرسال:', err.message);
+                // كشف سبب الفشل الحقيقي
+                console.error('❌ خطأ في الإرسال:');
+                if (err.response) {
+                    console.error('كود الخطأ:', err.response.status);
+                    console.error('تفاصيل:', err.response.data);
+                } else {
+                    console.error('الرسالة:', err.message);
+                }
             }
         }
     }

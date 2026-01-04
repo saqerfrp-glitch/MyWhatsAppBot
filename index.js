@@ -1,34 +1,41 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
-const express = require('express'); // إضافة ضرورية للسيرفر
+const express = require('express');
 
-// --- إعداد سيرفر بسيط لـ Railway ---
+// --- إعداد سيرفر الويب لـ Render ---
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 10000; // Render يفضل المنفذ 10000
 app.get('/', (req, res) => res.send('القرين يعمل في السحاب! 🚀'));
 app.listen(port, () => console.log(`سيرفر الويب جاهز على منفذ ${port}`));
 
-// 1. رابط جوجل سكربت الخاص بك
+// 1. رابط جوجل سكربت الخاص بك (تم الحفاظ عليه كما هو)
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxc6igVkJQBVocNljKrSLQuUERsl42yPegIeBvqkg_pzThii8Bt49lyHCng8bPzhIzKRQ/exec";
 
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        // تعديل المسار ليعمل على جهازك وعلى السيرفر تلقائياً
-        executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        // تم تعديل هذا الجزء ليعمل على لينكس (Render) وويندوز تلقائياً
+        executablePath: process.platform === 'win32' 
+            ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' 
+            : '/usr/bin/google-chrome-stable',
         headless: true,
         args: [
-            '--no-sandbox', 
+            '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage'
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
         ]
     }
 });
 
 // إظهار الـ QR Code في الـ Logs
 client.on('qr', (qr) => {
-    console.log('--- امسح الكود التالي من سجلات Railway ---');
+    console.log('--- امسح الكود التالي من سجلات السيرفر ---');
     qrcode.generate(qr, { small: true });
 });
 
@@ -37,7 +44,7 @@ client.on('ready', () => {
     console.log('✅ القرين متصل الآن وجاهز للاستخدام من السيرفر!');
 });
 
-// معالجة الرسائل (نفس منطقك الشغال مع إضافات السيرفر)
+// معالجة الرسائل وإرسالها لجوجل شيت
 client.on('message_create', async (msg) => {
     
     // ميزة القالب
@@ -65,7 +72,7 @@ client.on('message_create', async (msg) => {
                 rawDataText = `${shopName} \n عليكم = ${priceValue} \n العملية = ${actionValue} \n الموديل = ${modelValue}`;
             }
 
-            console.log(`📡 التقطت رسالة: [${shopName}] | جاري الإرسال للسيرفر...`);
+            console.log(`📡 التقطت رسالة: [${shopName}] | جاري الإرسال لـ Google Sheets...`);
 
             try {
                 const response = await axios.post(GOOGLE_SCRIPT_URL, rawDataText, {
@@ -73,12 +80,9 @@ client.on('message_create', async (msg) => {
                 });
                 
                 console.log('🚀 رد جوجل:', response.data);
-                
-                // تفاعل بسيط للتأكيد (اختياري)
-                // msg.react('✅');
 
             } catch (err) {
-                console.error('❌ خطأ في الإرسال:', err.message);
+                console.error('❌ خطأ في الإرسال لجوجل:', err.message);
             }
         }
     }

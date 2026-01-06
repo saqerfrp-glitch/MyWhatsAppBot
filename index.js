@@ -11,13 +11,13 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbHmQP8g0rjx
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
+// --- معالجة الرسائل ---
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
     if (!text || !text.includes('-')) return;
 
-    // تقسيم المدخلات: القمة للجوال-1000-frp-sama60
     let parts = text.split('-');
     if (parts.length >= 3) {
         let shop = parts[0].trim();
@@ -25,7 +25,6 @@ bot.on('message', async (msg) => {
         let proc = parts[2].trim();
         let model = parts[3] ? parts[3].trim() : "غير محدد";
 
-        // بناء نص الرسالة بالأسطر كما طلبت
         let formattedText = `${shop}\n`;
         formattedText += `الموديل: ${model}\n`;
         formattedText += `العملية: ${proc}\n`;
@@ -48,3 +47,11 @@ bot.on('message', async (msg) => {
         }
     }
 });
+
+// --- كود نبض القلب (يوضع خارج الدالة ليعمل مرة واحدة باستمرار) ---
+const URL_MY_APP = "https://mywhatsappbot-7jf2.onrender.com";
+setInterval(() => {
+    axios.get(URL_MY_APP)
+        .then(() => console.log('--- نبض القلب: البوت مستيقظ ---'))
+        .catch((err) => console.log('--- نبض القلب: تنبيه الاستيقاظ ---'));
+}, 10 * 60 * 1000); // كل 10 دقائق

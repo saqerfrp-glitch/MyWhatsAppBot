@@ -16,63 +16,25 @@ bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
-    if (!text || !text.includes('-')) return;
+    if (!text) return;
 
-    let parts = text.split('-');
-    let shop = parts[0] ? parts[0].trim() : "";
-    let p2 = parts[1] ? parts[1].trim() : "";
-    let p3 = parts[2] ? parts[2].trim() : "";
-    let p4 = parts[3] ? parts[3].trim() : "";
+    // إرسال النص كما هو تماماً لسكربت جوجل
+    try {
+        const response = await axios.post(GOOGLE_SCRIPT_URL, text, {
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
 
-    let jsonData = {};
-
-    // --- النوع الأول: رصيد للعميل (لكم) ---
-    // النموذج: القمة للجوال-لكم-1000-دفعة
-    if (p2 === "لكم") {
-        jsonData = {
-            "shop": shop,
-            "type": "رصيد/دفعة",
-            "price": p3,
-            "process": p4,
-            "model": "رصيد"
-        };
-    } 
-    // --- النوع الثاني: عملية عادية (عليكم) ---
-    // النموذج: القمة للجوال-A10-تخطي-500
-    else {
-        jsonData = {
-            "shop": shop,
-            "type": "عملية عادية",
-            "price": p4,
-            "process": p3,
-            "model": p2
-        };
-    }
-
-    if (jsonData.shop) {
-        try {
-            // إرسال البيانات كـ JSON مع تحديد النوع بدقة
-            const response = await axios({
-                method: 'post',
-                url: GOOGLE_SCRIPT_URL,
-                data: JSON.stringify(jsonData),
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
-                // نستخدم text/plain لتفادي مشاكل CORS في جوجل سكربت مع الـ POST
-            });
-
-            if (response.data.includes("Success")) {
-                bot.sendMessage(chatId, `✅ تم التسجيل بنجاح في شيت ${shop}`);
-            } else {
-                bot.sendMessage(chatId, "⚠️ رد جوجل: " + response.data);
-            }
-        } catch (e) {
-            console.error(e);
-            bot.sendMessage(chatId, "❌ فشل الاتصال بسيرفر جوجل.");
+        if (response.data.includes("Success")) {
+            bot.sendMessage(chatId, "✅ تم تسجيل البيانات في الشيت بنجاح.");
+        } else if (!response.data.includes("Ignored")) {
+            bot.sendMessage(chatId, "⚠️ رد السيرفر: " + response.data);
         }
+    } catch (e) {
+        bot.sendMessage(chatId, "❌ فشل الاتصال بسيرفر جوجل.");
     }
 });
 
-// نبض القلب لمنع النوم
+// نبض القلب
 setInterval(() => {
     axios.get(URL_MY_APP).catch(() => {});
 }, 10 * 60 * 1000);

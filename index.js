@@ -24,36 +24,41 @@ bot.on('message', async (msg) => {
     let p3 = parts[2] ? parts[2].trim() : "";
     let p4 = parts[3] ? parts[3].trim() : "";
 
-    // بناء الكائن JSON حسب ما يتوقعه السكربت الجديد
     let jsonData = {};
 
-    // --- الحالة الأولى: تسجيل رصيد للعميل (لكم) ---
-    // النموذج: القمة للجوال-لكم-1000-دفعة حساب
+    // --- النوع الأول: رصيد للعميل (لكم) ---
+    // النموذج: القمة للجوال-لكم-1000-دفعة
     if (p2 === "لكم") {
         jsonData = {
             "shop": shop,
-            "type": "رصيد/دفعة", // الكلمة الدالة في السكربت لتفعيل شرط العمود C
-            "price": p3,         // المبلغ
-            "process": p4,       // تفاصيل العملية
-            "model": "رصيد"      // ثابت للرصيد
+            "type": "رصيد/دفعة",
+            "price": p3,
+            "process": p4,
+            "model": "رصيد"
         };
     } 
-    // --- الحالة الثانية: تسجيل عملية عادية (عليكم) ---
+    // --- النوع الثاني: عملية عادية (عليكم) ---
     // النموذج: القمة للجوال-A10-تخطي-500
     else {
         jsonData = {
             "shop": shop,
             "type": "عملية عادية",
-            "price": p4,         // المبلغ يذهب لـ عليكم (العمود D)
-            "process": p3,       // العملية (تخطي)
-            "model": p2          // الموديل (A10)
+            "price": p4,
+            "process": p3,
+            "model": p2
         };
     }
 
     if (jsonData.shop) {
         try {
-            // إرسال البيانات بصيغة JSON حقيقية
-            const response = await axios.post(GOOGLE_SCRIPT_URL, JSON.stringify(jsonData));
+            // إرسال البيانات كـ JSON مع تحديد النوع بدقة
+            const response = await axios({
+                method: 'post',
+                url: GOOGLE_SCRIPT_URL,
+                data: JSON.stringify(jsonData),
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
+                // نستخدم text/plain لتفادي مشاكل CORS في جوجل سكربت مع الـ POST
+            });
 
             if (response.data.includes("Success")) {
                 bot.sendMessage(chatId, `✅ تم التسجيل بنجاح في شيت ${shop}`);
@@ -61,12 +66,13 @@ bot.on('message', async (msg) => {
                 bot.sendMessage(chatId, "⚠️ رد جوجل: " + response.data);
             }
         } catch (e) {
+            console.error(e);
             bot.sendMessage(chatId, "❌ فشل الاتصال بسيرفر جوجل.");
         }
     }
 });
 
-// نبض القلب
+// نبض القلب لمنع النوم
 setInterval(() => {
     axios.get(URL_MY_APP).catch(() => {});
 }, 10 * 60 * 1000);

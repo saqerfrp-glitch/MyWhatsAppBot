@@ -20,45 +20,49 @@ bot.on('message', async (msg) => {
 
     let parts = text.split('-');
     let shop = parts[0] ? parts[0].trim() : "";
-    let type = parts[1] ? parts[1].trim() : "";
-    let price = parts[2] ? parts[2].trim() : "";
-    let note = parts[3] ? parts[3].trim() : "";
+    let part2 = parts[1] ? parts[1].trim() : "";
+    let part3 = parts[2] ? parts[2].trim() : "";
+    let part4 = parts[3] ? parts[3].trim() : "";
 
     let formattedText = "";
 
-    // --- حالة "لكم" (دفعة حساب) ---
-    if (type === "لكم") {
-        // نرسل "لكم عملية" لكي يضعها السكربت في العمود E
-        // نرسل "السعر" مع == لكي يضع القيمة في العمود C
-        formattedText = `${shop}\n`;
-        formattedText += `لكم عملية == ${note}\n`; 
-        formattedText += `السعر == ${price}`;
+    // --- الحالة الأولى: التسجيل لصالح العميل (لكم) ---
+    // النموذج المطلوب: القمة للجوال-لكم-المبلغ-العملية
+    if (part2 === "لكم") {
+        let price = part3;
+        let actionNote = part4;
         
-        console.log("📡 إرسال دفعة لكم...");
+        formattedText = `${shop}\n`;
+        formattedText += `لكم عملية == ${actionNote}\n`; // تذهب لخانة العملية (E)
+        formattedText += `السعر == ${price}`;           // تذهب لخانة لكم (C)
+        
+        console.log("💰 إرسال (لكم) إلى جوجل...");
     } 
-    // --- حالة عملية عادية (عليكم) ---
+    // --- الحالة الثانية: العملية العادية (عليكم) ---
+    // النموذج المطلوب: القمة للجوال-الموديل-العملية-السعر
     else {
-        // نرسل "العملية" لكي تذهب للعمود E
-        // نرسل "عليكم" لكي تذهب للعمود D
-        // نرسل "الموديل" لكي يذهب للعمود F
+        let model = part2;
+        let process = part3;
+        let price = part4;
+
         formattedText = `${shop}\n`;
-        formattedText += `الموديل = ${note}\n`;
-        formattedText += `العملية = ${type}\n`;
-        formattedText += `عليكم = ${price}`;
+        formattedText += `الموديل = ${model}\n`;    // تذهب لخانة الموديل (F)
+        formattedText += `العملية = ${process}\n`; // تذهب لخانة العملية (E)
+        formattedText += `عليكم = ${price}`;       // تذهب لخانة عليكم (D)
         
-        console.log("📡 إرسال عملية عليكم...");
+        console.log("🛠 إرسال عملية عادية إلى جوجل...");
     }
 
-    if (formattedText !== "" && price !== "") {
+    if (formattedText !== "") {
         try {
             const response = await axios.post(GOOGLE_SCRIPT_URL, formattedText, {
                 headers: { 'Content-Type': 'text/plain; charset=utf-8' }
             });
 
             if (response.data.includes("Success")) {
-                bot.sendMessage(chatId, `✅ تم التسجيل بنجاح في شيت: ${shop}`);
+                bot.sendMessage(chatId, `✅ تم التسجيل بنجاح في ${shop}`);
             } else {
-                bot.sendMessage(chatId, "⚠️ خطأ في السكربت: " + response.data);
+                bot.sendMessage(chatId, "⚠️ رد جوجل: " + response.data);
             }
         } catch (e) {
             bot.sendMessage(chatId, "❌ فشل الاتصال بجوجل.");
@@ -66,7 +70,7 @@ bot.on('message', async (msg) => {
     }
 });
 
-// كود نبض القلب
+// نبض القلب لمنع النوم
 setInterval(() => {
     axios.get(URL_MY_APP).catch(() => {});
 }, 10 * 60 * 1000);

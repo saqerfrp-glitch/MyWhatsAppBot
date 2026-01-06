@@ -3,7 +3,7 @@ const axios = require('axios');
 const express = require('express');
 
 const app = express();
-app.get('/', (req, res) => res.send('Bot is Running'));
+app.get('/', (req, res) => res.send('Bot is Running 🚀'));
 app.listen(process.env.PORT || 10000);
 
 const TELEGRAM_TOKEN = '8012907736:AAE2ebdQb7qKgDcAhToNU3xFqgO9vizr52E';
@@ -24,29 +24,36 @@ bot.on('message', async (msg) => {
     let p3 = parts[2] ? parts[2].trim() : "";
     let p4 = parts[3] ? parts[3].trim() : "";
 
-    let formattedText = "";
+    // بناء الكائن JSON حسب ما يتوقعه السكربت الجديد
+    let jsonData = {};
 
-    // --- النوع الأول: تسجيل رصيد للعميل (لكم) ---
-    // النموذج: القمة للجوال-لكم-1000-دفعة
+    // --- الحالة الأولى: تسجيل رصيد للعميل (لكم) ---
+    // النموذج: القمة للجوال-لكم-1000-دفعة حساب
     if (p2 === "لكم") {
-        formattedText = `${shop}\n`;
-        formattedText += `لكم عملية == ${p4}\n`; // البيان في خانة العملية
-        formattedText += `السعر == ${p3}`;       // المبلغ في خانة "لكم"
+        jsonData = {
+            "shop": shop,
+            "type": "رصيد/دفعة", // الكلمة الدالة في السكربت لتفعيل شرط العمود C
+            "price": p3,         // المبلغ
+            "process": p4,       // تفاصيل العملية
+            "model": "رصيد"      // ثابت للرصيد
+        };
     } 
-    // --- النوع الثاني: تسجيل عملية على العميل (عليكم) ---
+    // --- الحالة الثانية: تسجيل عملية عادية (عليكم) ---
     // النموذج: القمة للجوال-A10-تخطي-500
     else {
-        formattedText = `${shop}\n`;
-        formattedText += `الموديل = ${p2}\n`;    // الموديل (A10)
-        formattedText += `العملية = ${p3}\n`;   // العملية (تخطي)
-        formattedText += `عليكم = ${p4}`;         // المبلغ في خانة "عليكم"
+        jsonData = {
+            "shop": shop,
+            "type": "عملية عادية",
+            "price": p4,         // المبلغ يذهب لـ عليكم (العمود D)
+            "process": p3,       // العملية (تخطي)
+            "model": p2          // الموديل (A10)
+        };
     }
 
-    if (formattedText !== "") {
+    if (jsonData.shop) {
         try {
-            const response = await axios.post(GOOGLE_SCRIPT_URL, formattedText, {
-                headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-            });
+            // إرسال البيانات بصيغة JSON حقيقية
+            const response = await axios.post(GOOGLE_SCRIPT_URL, JSON.stringify(jsonData));
 
             if (response.data.includes("Success")) {
                 bot.sendMessage(chatId, `✅ تم التسجيل بنجاح في شيت ${shop}`);
@@ -54,12 +61,12 @@ bot.on('message', async (msg) => {
                 bot.sendMessage(chatId, "⚠️ رد جوجل: " + response.data);
             }
         } catch (e) {
-            bot.sendMessage(chatId, "❌ خطأ في الاتصال.");
+            bot.sendMessage(chatId, "❌ فشل الاتصال بسيرفر جوجل.");
         }
     }
 });
 
-// نبض القلب لمنع النوم
+// نبض القلب
 setInterval(() => {
     axios.get(URL_MY_APP).catch(() => {});
 }, 10 * 60 * 1000);

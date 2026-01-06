@@ -1,78 +1,50 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
-// --- إعداد سيرفر الويب لمنع التوقف ---
 const app = express();
-const port = process.env.PORT || 10000;
-app.get('/', (req, res) => res.send('البوت مستيقظ وجاهز للعمل! 🚀'));
-app.listen(port, () => console.log(`سيرفر الويب يعمل على المنفذ ${port}`));
+app.get('/', (req, res) => res.send('Bot is Running'));
+app.listen(process.env.PORT || 10000);
 
-// 1. رابط جوجل سكربت الخاص بك
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxc6igVkJQBVocNljKrSLQuUERsl42yPegIeBvqkg_pzThii8Bt49lyHCng8bPzhIzKRQ/exec";
+const TELEGRAM_TOKEN = '8012907736:AAE2ebdQb7qKgDcAhToNU3xFqgO9vizr52E';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbHmQP8g0rjxYSkkQJPEqkMN2cruAlQk_BN6y-rkb_Yi-Xr39RZw_XtVSg5fbEeEN89A/exec';
 
-// 2. إعداد العميل مع جلسة محلية
-const client = new Client({
-    authStrategy: new LocalAuth(),
-    authTimeoutMs: 60000,
-    puppeteer: {
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu'
-        ],
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
-});
+const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
-// إظهار كود QR ورابط خارجي في حال التشويه
-client.on('qr', (qr) => {
-    console.log('--- كود QR جديد ---');
-    qrcode.generate(qr, { small: true });
-    console.log('إذا ظهر الكود مشوهاً، افتح هذا الرابط في متصفحك وامسحه:');
-    console.log(`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`);
-});
+bot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const text = msg.text;
 
-// عند الاتصال بنجاح
-client.on('ready', () => {
-    console.log('✅ تم الربط بنجاح! البوت جاهز لاستقبال الرسائل.');
-});
+    if (!text || !text.includes('-')) return;
 
-// معالجة الرسائل بنموذج: القمه للجوال-1000-frp-sama60
-client.on('message_create', async (msg) => {
-    
-    // طباعة أي رسالة تصل في الـ Logs للتأكد من عمل البوت
-    console.log(`📩 رسالة مستلمة: ${msg.body}`);
+    // تقسيم المدخلات: القمة للجوال-1000-frp-sama60
+    let parts = text.split('-');
+    if (parts.length >= 3) {
+        let shop = parts[0].trim();
+        let price = parts[1].trim();
+        let proc = parts[2].trim();
+        let model = parts[3] ? parts[3].trim() : "غير محدد";
 
-    // فحص الرسائل التي تحتوي على شرطة "-"
-    if (msg.body.includes('-')) {
-        let parts = msg.body.split('-');
-        
-        // التأكد أن الرسالة مطابقة للنموذج (على الأقل 3 أجزاء)
-        if (parts.length >= 3) {
-            let rawDataText = msg.body; // إرسال النص كما هو: القمه للجوال-1000-frp-sama60
+        // بناء نص الرسالة بالأسطر كما طلبت
+        let formattedText = `${shop}\n`;
+        formattedText += `الموديل: ${model}\n`;
+        formattedText += `العملية: ${proc}\n`;
+        formattedText += `السعر: ${price}`;
 
-            console.log(`📡 جاري إرسال البيانات لجوجل: [${rawDataText}]`);
+        console.log("📡 إرسال البيانات لجوجل:\n", formattedText);
 
-            try {
-                const response = await axios.post(GOOGLE_SCRIPT_URL, rawDataText, {
-                    headers: { 'Content-Type': 'text/plain' }
-                });
-                
-                console.log('🚀 رد جوجل النهائي:', response.data);
-                
-                // تأكيد في واتساب (اختياري)
-                if (response.data.includes("success")) {
-                    console.log("✅ تم التسجيل بنجاح في الشيت.");
-                }
-            } catch (err) {
-                console.error('❌ فشل الإرسال، السبب:', err.response ? err.response.data : err.message);
+        try {
+            const response = await axios.post(GOOGLE_SCRIPT_URL, formattedText, {
+                headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+            });
+
+            if (response.data.includes("Success")) {
+                bot.sendMessage(chatId, `✅ تم التسجيل بنجاح:\n💰 السعر: ${price}\n🛠 العملية: ${proc}`);
+            } else {
+                bot.sendMessage(chatId, "⚠️ استلم جوجل البيانات ولكن حدث خطأ في التصنيف.");
             }
+        } catch (e) {
+            bot.sendMessage(chatId, "❌ فشل الاتصال بسيرفر جوجل.");
         }
     }
 });
-
-client.initialize();

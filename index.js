@@ -3,96 +3,92 @@ const axios = require('axios');
 const express = require('express');
 
 const app = express();
-app.get('/', (req, res) => res.send('Bot Status: Online 🚀'));
-app.listen(process.env.PORT || 10000, () => console.log("Web server is live"));
+app.get('/', (req, res) => res.send('Bot is Running 🚀'));
+app.listen(process.env.PORT || 10000);
 
 const TELEGRAM_TOKEN = '8012907736:AAE2ebdQb7qKgDcAhToNU3xFqgO9vizr52E';
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbHmQP8g0rjxYSkkQJPEqkMN2cruAlQk_BN6y-rkb_Yi-Xr39RZw_XtVSg5fbEeEN89A/exec';
 
+// --- ضع هنا الرقم الذي تريد استلام كل الرسائل عليه (رقمك أنت) ---
+// الرقم بالصيغة الدولية بدون أصفار في البداية وبدون + (مثلاً اليمن 967)
+const MY_WHATSAPP_NUMBER = "967775787199"; 
+
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
-// --- 1. برمجة قائمة الأوامر المجمعة ---
+// قائمة الأوامر الموحدة
 bot.setMyCommands([
-    { command: 'start', description: 'عرض التعليمات والنماذج' },
-    { command: 'aliakum', description: 'القمة: نموذج (عليكم)' },
-    { command: 'lakum', description: 'القمة: نموذج (لكم)' },
-    { command: 'zain_aliakum', description: 'زين فون: نموذج (عليكم)' },
-    { command: 'zain_lakum', description: 'زين فون: نموذج (لكم)' }
-]).then(() => console.log("Commands updated with Zain Phone"));
+    { command: 'start', description: 'النماذج والتعليمات' },
+    { command: 'aliakum', description: 'القمة: نموذج عليكم' },
+    { command: 'lakum', description: 'القمة: نموذج لكم' },
+    { command: 'zain', description: 'زين فون: نموذج عليكم' },
+    { command: 'adnan', description: 'عدنان بايزيد: نموذج عليكم' }
+]);
 
-// --- 2. معالجة الرسائل والأوامر ---
-bot.on('message', (msg) => {
+bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
     if (!text) return;
 
-    // --- أمر البداية /start ---
+    // --- أوامر النماذج السريعة ---
     if (text === '/start') {
-        const welcome = "📊 **مرحباً بك في بوت إدارة الحسابات**\n\n" +
-                        "الآن يمكنك التسجيل للمحلين بسهولة، انسخ النموذج المطلوب عدل البيانات:\n\n" +
-                        "🏢 **القمة للجوال:**\n" +
-                        "• عليكم: `/aliakum` \n" +
-                        "• لكم: `/lakum` \n\n" +
-                        "🏢 **زين فون:**\n" +
-                        "• عليكم: `/zain_aliakum` \n" +
-                        "• لكم: `/zain_lakum` \n\n" +
-                        "💡 اضغط على الأمر ليتم إرسال النموذج القابل للنسخ.";
-        bot.sendMessage(chatId, welcome, { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, "📊 **مرحباً بك**\nاضغط للنسخ ثم عدل البيانات:\n\n🏢 القمة: `/aliakum`\n🏢 زين: `/zain`\n🏢 عدنان: `/adnan`", { parse_mode: 'Markdown' });
+        return;
+    }
+    if (text === '/aliakum') {
+        bot.sendMessage(chatId, "القمة للجوال-الموديل-العملية-السعر");
+        return;
+    }
+    if (text === '/zain') {
+        bot.sendMessage(chatId, "زين فون-الموديل-العملية-السعر");
+        return;
+    }
+    if (text === '/adnan') {
+        bot.sendMessage(chatId, "عدنان بايزيد-الموديل-العملية-السعر");
+        return;
     }
 
-    // --- نماذج القمة للجوال ---
-    else if (text === '/aliakum') {
-        bot.sendMessage(chatId, "نسخ وتعديل (القمة - عليكم):\n`القمة للجوال-الموديل-العملية-السعر`", { parse_mode: 'Markdown' });
-    }
-    else if (text === '/lakum') {
-        bot.sendMessage(chatId, "نسخ وتعديل (القمة - لكم):\n`القمة للجوال-لكم-المبلغ-البيان`", { parse_mode: 'Markdown' });
-    }
+    // --- معالجة التسجيل (الرسائل التي تحتوي على -) ---
+    if (text.includes('-') && !text.startsWith('/')) {
+        let parts = text.split('-');
+        let shop = parts[0].trim();
+        let p2 = parts[1] ? parts[1].trim() : "";
+        let p3 = parts[2] ? parts[2].trim() : "";
+        let p4 = parts[3] ? parts[3].trim() : "";
 
-    // --- نماذج زين فون ---
-    else if (text === '/zain_aliakum') {
-        bot.sendMessage(chatId, "نسخ وتعديل (زين فون - عليكم):\n`زين فون-الموديل-العملية-السعر`", { parse_mode: 'Markdown' });
-    }
-    else if (text === '/zain_lakum') {
-        bot.sendMessage(chatId, "نسخ وتعديل (زين فون - لكم):\n`زين فون-لكم-المبلغ-البيان`", { parse_mode: 'Markdown' });
-    }
+        let formattedTextForGoogle = "";
+        let waMsg = "";
 
-    // --- معالجة التسجيل التلقائي (الرسائل التي تحتوي على -) ---
-    else if (text.includes('-') && !text.startsWith('/')) {
-        processSheetData(chatId, text);
+        if (p2 === "لكم") {
+            formattedTextForGoogle = `${shop}\nلكم عملية == ${p4}\nالسعر == ${p3}`;
+            waMsg = `✅ *تمت عملية الإيداع بنجاح*\n\n🏢 المحل: ${shop}\n💵 المبلغ: ${p3}\n📝 البيان: ${p4}\n\nشكراً لتعاملكم معنا 🌹`;
+        } else {
+            formattedTextForGoogle = `${shop}\nالموديل = ${p2}\nالعملية = ${p3}\nعليكم = ${p4}`;
+            waMsg = `✅ *تمت العملية بنجاح*\n\n🏢 المحل: ${shop}\n📱 الموديل: ${p2}\n🛠 العملية: ${p3}\n💸 السعر: ${p4}\n\nشكراً لتعاملكم معنا 🌹`;
+        }
+
+        try {
+            const response = await axios.post(GOOGLE_SCRIPT_URL, formattedTextForGoogle);
+            if (response.data.includes("Success")) {
+                
+                const encodedMsg = encodeURIComponent(waMsg);
+                // الرابط الآن دائماً يرسل لرقمك الشخصي الموحد
+                const waLink = `https://wa.me/${MY_WHATSAPP_NUMBER}?text=${encodedMsg}`;
+
+                const opts = {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [[{ text: '📲 إرسال الفاتورة للواتساب', url: waLink }]]
+                    }
+                };
+
+                bot.sendMessage(chatId, `✅ تم التسجيل لـ *${shop}*\n\nالآن اضغط الزر لإرسالها لواتسابك ثم وجهها للعميل.`, opts);
+            }
+        } catch (e) {
+            bot.sendMessage(chatId, "❌ فشل الاتصال بجوجل.");
+        }
     }
 });
 
-// --- 3. دالة إرسال البيانات لجوجل ---
-async function processSheetData(chatId, text) {
-    let parts = text.split('-');
-    let shop = parts[0].trim();
-    let p2 = parts[1] ? parts[1].trim() : "";
-    let p3 = parts[2] ? parts[2].trim() : "";
-    let p4 = parts[3] ? parts[3].trim() : "";
-
-    let formattedText = "";
-    
-    // فحص إذا كانت العملية "لكم"
-    if (p2 === "لكم") {
-        formattedText = `${shop}\nلكم عملية == ${p4}\nالسعر == ${p3}`;
-    } else {
-        formattedText = `${shop}\nالموديل = ${p2}\nالعملية = ${p3}\nعليكم = ${p4}`;
-    }
-
-    try {
-        const response = await axios.post(GOOGLE_SCRIPT_URL, formattedText);
-        if (response.data.includes("Success")) {
-            bot.sendMessage(chatId, `✅ تم التسجيل بنجاح لـ: **${shop}**`, { parse_mode: 'Markdown' });
-        } else {
-            bot.sendMessage(chatId, "⚠️ رد جوجل: " + response.data);
-        }
-    } catch (e) {
-        bot.sendMessage(chatId, "❌ فشل الاتصال بسيرفر جوجل.");
-    }
-}
-
-// --- 4. نبض القلب (Keep-Alive) ---
-setInterval(() => { 
-    axios.get("https://mywhatsappbot-7jf2.onrender.com").catch(() => {}); 
-}, 5 * 60 * 1000);
+// نبض القلب
+setInterval(() => { axios.get("https://mywhatsappbot-7jf2.onrender.com").catch(()=>{}); }, 5 * 60 * 1000);

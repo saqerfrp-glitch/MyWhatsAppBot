@@ -2,52 +2,69 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const express = require('express');
 
-// --- إعداد السيرفر لمنع النوم ---
 const app = express();
-app.get('/', (req, res) => res.send('Bot is Running 🚀'));
-app.listen(process.env.PORT || 10000);
+app.get('/', (req, res) => res.send('Bot Status: Online 🚀'));
+app.listen(process.env.PORT || 10000, () => console.log("Web server is live"));
 
-// --- الإعدادات الأساسية ---
 const TELEGRAM_TOKEN = '8012907736:AAE2ebdQb7qKgDcAhToNU3xFqgO9vizr52E';
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbHmQP8g0rjxYSkkQJPEqkMN2cruAlQk_BN6y-rkb_Yi-Xr39RZw_XtVSg5fbEeEN89A/exec';
-const URL_MY_APP = "https://mywhatsappbot-7jf2.onrender.com";
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
-// --- رسالة الترحيب والنماذج الثابتة ---
-const welcomeMessage = `
-مرحباً بك في بوت إدارة الحسابات 📊
+// --- 1. برمجة قائمة الأوامر المجمعة ---
+bot.setMyCommands([
+    { command: 'start', description: 'عرض التعليمات والنماذج' },
+    { command: 'aliakum', description: 'القمة: نموذج (عليكم)' },
+    { command: 'lakum', description: 'القمة: نموذج (لكم)' },
+    { command: 'zain_aliakum', description: 'زين فون: نموذج (عليكم)' },
+    { command: 'zain_lakum', description: 'زين فون: نموذج (لكم)' }
+]).then(() => console.log("Commands updated with Zain Phone"));
 
-لضمان تسجيل البيانات بشكل صحيح، يرجى استخدام النماذج التالية:
-
-1️⃣ **عملية عادية (عليكم):**
-(المحل-الموديل-العملية-السعر)
-مثال: \`القمة للجوال-A10-تخطي حساب-5000\`
-
-2️⃣ **دفعة حساب (لكم):**
-(المحل-لكم-المبلغ-البيان)
-مثال: \`القمة للجوال-لكم-10000-تصفية حساب\`
-
-💡 فقط قم بنسخ النموذج وتعديل البيانات المرسلة.
-`;
-
-bot.onText(/\/start/, (msg) => {
-    bot.sendMessage(msg.chat.id, welcomeMessage, { parse_mode: 'Markdown' });
-});
-
-// --- معالجة الرسائل الواردة ---
-bot.on('message', async (msg) => {
+// --- 2. معالجة الرسائل والأوامر ---
+bot.on('message', (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
-    // تجاهل الأوامر مثل /start
-    if (!text || text.startsWith('/')) return;
+    if (!text) return;
 
-    // التأكد من وجود الشرطات كفاصل
-    if (!text.includes('-')) {
-        return bot.sendMessage(chatId, "⚠️ صيغة الرسالة غير صحيحة. يرجى استخدام الشرطة (-) بين البيانات.");
+    // --- أمر البداية /start ---
+    if (text === '/start') {
+        const welcome = "📊 **مرحباً بك في بوت إدارة الحسابات**\n\n" +
+                        "الآن يمكنك التسجيل للمحلين بسهولة، انسخ النموذج المطلوب عدل البيانات:\n\n" +
+                        "🏢 **القمة للجوال:**\n" +
+                        "• عليكم: `/aliakum` \n" +
+                        "• لكم: `/lakum` \n\n" +
+                        "🏢 **زين فون:**\n" +
+                        "• عليكم: `/zain_aliakum` \n" +
+                        "• لكم: `/zain_lakum` \n\n" +
+                        "💡 اضغط على الأمر ليتم إرسال النموذج القابل للنسخ.";
+        bot.sendMessage(chatId, welcome, { parse_mode: 'Markdown' });
     }
 
+    // --- نماذج القمة للجوال ---
+    else if (text === '/aliakum') {
+        bot.sendMessage(chatId, "نسخ وتعديل (القمة - عليكم):\n`القمة للجوال-الموديل-العملية-السعر`", { parse_mode: 'Markdown' });
+    }
+    else if (text === '/lakum') {
+        bot.sendMessage(chatId, "نسخ وتعديل (القمة - لكم):\n`القمة للجوال-لكم-المبلغ-البيان`", { parse_mode: 'Markdown' });
+    }
+
+    // --- نماذج زين فون ---
+    else if (text === '/zain_aliakum') {
+        bot.sendMessage(chatId, "نسخ وتعديل (زين فون - عليكم):\n`زين فون-الموديل-العملية-السعر`", { parse_mode: 'Markdown' });
+    }
+    else if (text === '/zain_lakum') {
+        bot.sendMessage(chatId, "نسخ وتعديل (زين فون - لكم):\n`زين فون-لكم-المبلغ-البيان`", { parse_mode: 'Markdown' });
+    }
+
+    // --- معالجة التسجيل التلقائي (الرسائل التي تحتوي على -) ---
+    else if (text.includes('-') && !text.startsWith('/')) {
+        processSheetData(chatId, text);
+    }
+});
+
+// --- 3. دالة إرسال البيانات لجوجل ---
+async function processSheetData(chatId, text) {
     let parts = text.split('-');
     let shop = parts[0].trim();
     let p2 = parts[1] ? parts[1].trim() : "";
@@ -55,37 +72,27 @@ bot.on('message', async (msg) => {
     let p4 = parts[3] ? parts[3].trim() : "";
 
     let formattedText = "";
-
-    // التحقق من نوع العملية (لكم أم عملية عادية)
+    
+    // فحص إذا كانت العملية "لكم"
     if (p2 === "لكم") {
-        // النموذج: القمة للجوال-لكم-1000-دفعه حساب
-        formattedText = `${shop}\n`;
-        formattedText += `لكم عملية == ${p4}\n`;
-        formattedText += `السعر == ${p3}`;
+        formattedText = `${shop}\nلكم عملية == ${p4}\nالسعر == ${p3}`;
     } else {
-        // النموذج: القمة للجوال-الموديل-العملية-السعر
-        formattedText = `${shop}\n`;
-        formattedText += `الموديل = ${p2}\n`;
-        formattedText += `العملية = ${p3}\n`;
-        formattedText += `عليكم = ${p4}`;
+        formattedText = `${shop}\nالموديل = ${p2}\nالعملية = ${p3}\nعليكم = ${p4}`;
     }
 
     try {
-        const response = await axios.post(GOOGLE_SCRIPT_URL, formattedText, {
-            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-        });
-
+        const response = await axios.post(GOOGLE_SCRIPT_URL, formattedText);
         if (response.data.includes("Success")) {
-            bot.sendMessage(chatId, `✅ تم التسجيل بنجاح في شيت (${shop})`);
+            bot.sendMessage(chatId, `✅ تم التسجيل بنجاح لـ: **${shop}**`, { parse_mode: 'Markdown' });
         } else {
-            bot.sendMessage(chatId, `⚠️ رد جوجل: ${response.data}`);
+            bot.sendMessage(chatId, "⚠️ رد جوجل: " + response.data);
         }
     } catch (e) {
-        bot.sendMessage(chatId, "❌ فشل الاتصال بسيرفر جوجل. تأكد من الرابط.");
+        bot.sendMessage(chatId, "❌ فشل الاتصال بسيرفر جوجل.");
     }
-});
+}
 
-// --- نبض القلب (Keep-Alive) كل 5 دقائق ---
-setInterval(() => {
-    axios.get(URL_MY_APP).catch(() => console.log("Ping..."));
+// --- 4. نبض القلب (Keep-Alive) ---
+setInterval(() => { 
+    axios.get("https://mywhatsappbot-7jf2.onrender.com").catch(() => {}); 
 }, 5 * 60 * 1000);

@@ -10,38 +10,34 @@ const TELEGRAM_TOKEN = '8012907736:AAE2ebdQb7qKgDcAhToNU3xFqgO9vizr52E';
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbHmQP8g0rjxYSkkQJPEqkMN2cruAlQk_BN6y-rkb_Yi-Xr39RZw_XtVSg5fbEeEN89A/exec';
 const MY_WHATSAPP_NUMBER = "967775787199"; 
 
-// 🛡️ --- ضع هنا الـ Chat ID الخاص بك الذي استخرجته ---
-const ADMIN_ID = 656096830; // استبدل هذا الرقم برقمه الحقيقي
+// 🛡️ استبدل هذا الرقم بالرقم الذي حصلت عليه من @userinfobot
+const ADMIN_ID = 123456789; 
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
-// تحديث قائمة الأوامر
 bot.setMyCommands([
     { command: 'start', description: 'النماذج والتعليمات' },
-    { command: 'balance', description: '💰 كشف الحساب (الرصيد)' },
+    { command: 'balance', description: '💰 كشف الحساب' },
+    { command: 'today', description: '📊 تقرير اليومية' },
     { command: 'aliakum', description: 'القمة: عليكم' },
-    { command: 'zain', description: 'زين فون: عليكم' },
+    { command: 'zain', description: 'زين: عليكم' },
     { command: 'adnan', description: 'عدنان: عليكم' },
     { command: 'mohandes', description: 'المهندس: عليكم' }
 ]);
 
-// نظام فلترة المستخدمين (الحماية)
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
-    // ⛔ التحقق من الهوية: إذا كان المستخدم ليس أنت، البوت يتجاهله تماماً
     if (chatId !== ADMIN_ID) {
-        bot.sendMessage(chatId, "⛔ عذراً، هذا البوت خاص وغير مصرح لك باستخدامه.");
-        console.log(`محاولة وصول غير مصرحة من: ${chatId}`);
+        bot.sendMessage(chatId, "⛔ الوصول مرفوض.");
         return;
     }
 
     if (!text) return;
 
-    // --- أوامر البوت المسموحة (تنفذ فقط إذا كان chatId هو ADMIN_ID) ---
     if (text === '/balance') {
-        const shopsKeyboard = {
+        const keyboard = {
             reply_markup: {
                 inline_keyboard: [
                     [{ text: 'القمة للجوال', callback_data: 'bal_القمة للجوال' }, { text: 'زين فون', callback_data: 'bal_زين فون' }],
@@ -49,91 +45,69 @@ bot.on('message', async (msg) => {
                 ]
             }
         };
-        bot.sendMessage(chatId, "💰 **اختر المحل لعرض كشف الحساب:**", shopsKeyboard);
+        bot.sendMessage(chatId, "💰 **اختر المحل لعرض الرصيد:**", keyboard);
+        return;
+    }
+
+    if (text === '/today') {
+        bot.sendMessage(chatId, "⏳ جاري تجميع تقرير اليوم...");
+        try {
+            const res = await axios.post(GOOGLE_SCRIPT_URL, "GET_TODAY_REPORT");
+            if (res.data.includes("REPORT")) {
+                const p = res.data.split('|');
+                bot.sendMessage(chatId, `📅 **تقرير الإنجاز اليومي**\n--------------------------\n✅ العمليات: ${p[2]}\n💰 المبلغ: ${Number(p[1]).toLocaleString()} ريال\n\n**التفاصيل:**\n${p[3] || "لا يوجد"}`, { parse_mode: 'Markdown' });
+            }
+        } catch (e) { bot.sendMessage(chatId, "❌ فشل الاتصال."); }
         return;
     }
 
     if (text.startsWith('/')) {
         handleCommands(chatId, text);
-        return;
-    }
-
-    if (text.includes('-')) {
+    } else if (text.includes('-')) {
         processTransaction(chatId, text);
     }
 });
 
-// معالجة الأزرار (مع الحماية أيضاً)
 bot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
-    if (chatId !== ADMIN_ID) return; // حماية إضافية
-
-    const data = query.data;
-    if (data.startsWith('bal_')) {
-        const shopName = data.split('_')[1];
-        bot.answerCallbackQuery(query.id, { text: 'جاري جلب الرصيد...' });
-        bot.sendMessage(chatId, `⏳ جاري حساب رصيد *${shopName}*...`, { parse_mode: 'Markdown' });
-
-        try {
-            const response = await axios.post(GOOGLE_SCRIPT_URL, `BALANCE_CHECK:${shopName}`);
-            if (response.data.includes("BALANCE_RESULT")) {
-                const parts = response.data.split('|');
-                const totalAliakum = Number(parts[1]).toLocaleString();
-                const totalLakum = Number(parts[2]).toLocaleString();
-                const netBalance = Number(parts[3]).toLocaleString();
-
-                const msg = `💰 **كشف حساب: ${shopName}**\n\n` +
-                            `🔴 إجمالي عليكم: ${totalAliakum}\n` +
-                            `🟢 إجمالي لكم (واصل): ${totalLakum}\n` +
-                            `---------------------------------\n` +
-                            `💵 **الصافي المتبقي: ${netBalance}**`;
-                bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
-            }
-        } catch (e) {
-            bot.sendMessage(chatId, "❌ فشل الاتصال بجوجل.");
+    if (chatId !== ADMIN_ID) return;
+    const shop = query.data.split('_')[1];
+    bot.answerCallbackQuery(query.id);
+    bot.sendMessage(chatId, `⏳ حساب رصيد *${shop}*...`, { parse_mode: 'Markdown' });
+    try {
+        const res = await axios.post(GOOGLE_SCRIPT_URL, `BALANCE_CHECK:${shop}`);
+        if (res.data.includes("BALANCE_RESULT")) {
+            const p = res.data.split('|');
+            const msg = `💰 **كشف حساب: ${shop}**\n\n🔴 عليكم: ${Number(p[1]).toLocaleString()}\n🟢 لكم: ${Number(p[2]).toLocaleString()}\n----------------\n💵 **الصافي: ${Number(p[3]).toLocaleString()}**`;
+            bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
         }
-    }
+    } catch (e) { bot.sendMessage(chatId, "❌ خطأ."); }
 });
 
-// دالة تسجيل العمليات
 async function processTransaction(chatId, text) {
     let parts = text.split('-');
-    let shop = parts[0].trim();
-    let p2 = parts[1] ? parts[1].trim() : "";
-    let p3 = parts[2] ? parts[2].trim() : "";
-    let p4 = parts[3] ? parts[3].trim() : "";
-
-    let waMsg = "";
-    let googleData = "";
-
-    if (p2 === "لكم") {
-        googleData = `${shop}\nلكم عملية == ${p4}\nالسعر == ${p3}`;
-        waMsg = `✅ *تمت عملية الإيداع بنجاح*\n\n🏢 المحل: ${shop}\n💵 المبلغ: ${p3}\n📝 البيان: ${p4}\n\nشكراً لتعاملكم معنا 🌹`;
-    } else {
-        googleData = `${shop}\nالموديل = ${p2}\nالعملية = ${p3}\nعليكم = ${p4}`;
-        waMsg = `✅ *تمت العملية بنجاح*\n\n🏢 المحل: ${shop}\n📱 الموديل: ${p2}\n🛠 العملية: ${p3}\n💸 السعر: ${p4}\n\nشكراً لتعاملكم معنا 🌹`;
-    }
+    let shop = parts[0].trim(), p2 = parts[1], p3 = parts[2], p4 = parts[3];
+    let googleData = (p2 === "لكم") ? `${shop}\nلكم عملية == ${p4}\nالسعر == ${p3}` : `${shop}\nالموديل = ${p2}\nالعملية = ${p3}\nعليكم = ${p4}`;
+    let waMsg = (p2 === "لكم") ? `✅ *تمت عملية الإيداع*\n\n🏢 المحل: ${shop}\n💵 المبلغ: ${p3}\n📝 البيان: ${p4}\n\nشكراً لتعاملكم 🌹` : `✅ *تمت العملية بنجاح*\n\n🏢 المحل: ${shop}\n📱 الموديل: ${p2}\n🛠 العملية: ${p3}\n💸 السعر: ${p4}\n\nشكراً لتعاملكم 🌹`;
 
     try {
-        const response = await axios.post(GOOGLE_SCRIPT_URL, googleData);
-        if (response.data.includes("Success")) {
-            const encodedMsg = encodeURIComponent(waMsg);
-            const waLink = `https://api.whatsapp.com/send?phone=${MY_WHATSAPP_NUMBER}&text=${encodedMsg}`;
-            const responseMsg = `✅ **سُجلت في الشيت لـ ${shop}**\n\n📄 **النص المنسق (اضغط للنسخ):**\n\`${waMsg}\``;
-            const opts = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '📲 فتح واتساب الأعمال', url: waLink }]] } };
-            bot.sendMessage(chatId, responseMsg, opts);
+        const res = await axios.post(GOOGLE_SCRIPT_URL, googleData);
+        if (res.data.includes("Success")) {
+            const waLink = `https://api.whatsapp.com/send?phone=${MY_WHATSAPP_NUMBER}&text=${encodeURIComponent(waMsg)}`;
+            bot.sendMessage(chatId, `✅ سُجلت لـ *${shop}*\n\n\`${waMsg}\``, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '📲 فتح واتساب', url: waLink }]] } });
         }
-    } catch (e) {
-        bot.sendMessage(chatId, "❌ فشل الاتصال بجوجل.");
-    }
+    } catch (e) { bot.sendMessage(chatId, "❌ خطأ."); }
 }
 
 function handleCommands(chatId, text) {
-    if (text === '/start') bot.sendMessage(chatId, "✅ النظام جاهز ومحمي.\nاستخدم /balance للرصيد.");
-    if (text === '/aliakum') bot.sendMessage(chatId, "`القمة للجوال-الموديل-العملية-السعر`", {parse_mode: 'Markdown'});
-    if (text === '/zain') bot.sendMessage(chatId, "`زين فون-الموديل-العملية-السعر`", {parse_mode: 'Markdown'});
-    if (text === '/adnan') bot.sendMessage(chatId, "`عدنان بايزيد-الموديل-العملية-السعر`", {parse_mode: 'Markdown'});
-    if (text === '/mohandes') bot.sendMessage(chatId, "`المهندس-الموديل-العملية-السعر`", {parse_mode: 'Markdown'});
+    const templates = {
+        '/start': "✅ النظام جاهز ومحمي.\nاستخدم /balance للرصيد و /today للتقرير.",
+        '/aliakum': "`القمة للجوال-الموديل-العملية-السعر`",
+        '/zain': "`زين فون-الموديل-العملية-السعر`",
+        '/adnan': "`عدنان بايزيد-الموديل-العملية-السعر`",
+        '/mohandes': "`المهندس-الموديل-العملية-السعر`"
+    };
+    if (templates[text]) bot.sendMessage(chatId, templates[text], { parse_mode: 'Markdown' });
 }
 
 setInterval(() => { axios.get("https://mywhatsappbot-7jf2.onrender.com").catch(()=>{}); }, 5 * 60 * 1000);

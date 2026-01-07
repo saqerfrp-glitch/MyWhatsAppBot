@@ -11,7 +11,7 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbHmQP8g0rjx
 const MY_WHATSAPP_NUMBER = "967775787199"; 
 
 // 🛡️ استبدل هذا الرقم بالرقم الذي حصلت عليه من @userinfobot
-const ADMIN_ID = 123456789; 
+const ADMIN_ID = 444444444; 
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 

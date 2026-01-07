@@ -9,16 +9,26 @@ app.listen(process.env.PORT || 10000);
 const TELEGRAM_TOKEN = '8012907736:AAE2ebdQb7qKgDcAhToNU3xFqgO9vizr52E';
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbHmQP8g0rjxYSkkQJPEqkMN2cruAlQk_BN6y-rkb_Yi-Xr39RZw_XtVSg5fbEeEN89A/exec';
 
-// رقمك الموحد (واتساب أعمال)
 const MY_WHATSAPP_NUMBER = "967775787199"; 
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+
+// تحديث قائمة الأوامر
+bot.setMyCommands([
+    { command: 'start', description: 'النماذج والتعليمات' },
+    { command: 'aliakum', description: 'القمة: نموذج عليكم' },
+    { command: 'zain', description: 'زين فون: نموذج عليكم' },
+    { command: 'adnan', description: 'عدنان بايزيد: نموذج عليكم' },
+    { command: 'mohandes', description: 'المهندس: نموذج عليكم' }
+]);
 
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
-    if (!text || text.startsWith('/')) {
+    if (!text) return;
+
+    if (text.startsWith('/')) {
         handleCommands(chatId, text);
         return;
     }
@@ -44,9 +54,7 @@ bot.on('message', async (msg) => {
         try {
             const response = await axios.post(GOOGLE_SCRIPT_URL, googleData);
             if (response.data.includes("Success")) {
-                
                 const encodedMsg = encodeURIComponent(waMsg);
-                // استخدام رابط api.whatsapp لضمان استجابة أسرع للتطبيقات المثبتة
                 const waLink = `https://api.whatsapp.com/send?phone=${MY_WHATSAPP_NUMBER}&text=${encodedMsg}`;
 
                 const responseMsg = `✅ **سُجلت في الشيت لـ ${shop}**\n\n` +
@@ -59,7 +67,6 @@ bot.on('message', async (msg) => {
                         inline_keyboard: [[{ text: '📲 فتح واتساب الأعمال الآن', url: waLink }]]
                     }
                 };
-
                 bot.sendMessage(chatId, responseMsg, opts);
             }
         } catch (e) {
@@ -70,10 +77,16 @@ bot.on('message', async (msg) => {
 
 function handleCommands(chatId, text) {
     if (text === '/start') {
-        bot.sendMessage(chatId, "مرحباً بك! أرسل البيانات بالصيغة المعروفة أو استخدم الأوامر.");
+        bot.sendMessage(chatId, "📊 **النماذج الجاهزة (اضغط للنسخ):**\n\n🏢 القمة: `/aliakum`\n🏢 زين: `/zain`\n🏢 عدنان: `/adnan`\n🏢 المهندس: `/mohandes`", { parse_mode: 'Markdown' });
+    } else if (text === '/aliakum') {
+        bot.sendMessage(chatId, "`القمة للجوال-الموديل-العملية-السعر`", { parse_mode: 'Markdown' });
+    } else if (text === '/zain') {
+        bot.sendMessage(chatId, "`زين فون-الموديل-العملية-السعر`", { parse_mode: 'Markdown' });
+    } else if (text === '/adnan') {
+        bot.sendMessage(chatId, "`عدنان بايزيد-الموديل-العملية-السعر`", { parse_mode: 'Markdown' });
+    } else if (text === '/mohandes') {
+        bot.sendMessage(chatId, "`المهندس-الموديل-العملية-السعر`", { parse_mode: 'Markdown' });
     }
-    // يمكن إضافة أوامر النماذج هنا كما في السابق
 }
 
-// نبض القلب
 setInterval(() => { axios.get("https://mywhatsappbot-7jf2.onrender.com").catch(()=>{}); }, 5 * 60 * 1000);

@@ -125,8 +125,8 @@ async function processTransaction(chatId, shop, type, p1, p2, p3) {
             let dateStr = now.toLocaleDateString('en-GB');
             let dayStr = daysAr[now.getDay()];
 
-            // رسالة واتساب منسقة بالخط العريض للعمليات الأساسية
-            let waMsg = `${header}\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n*🏢 المحل:* ${shop}\n${body}\n*📅 التاريخ:* ${dateStr}\n*📆 اليوم:* ${dayStr}\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n✅ *تم التوثيق بنجاح*\n🌹 *شكراً لتعاملكم معنا*`;
+            // رسالة واتساب منسقة بالكامل مع الرموز وعبارة الإشعار الآلي
+            let waMsg = `${header}\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n*🏢 المحل:* ${shop}\n${body}\n*📅 التاريخ:* ${dateStr}\n*📆 اليوم:* ${dayStr}\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n*🤖 هذا الإشعار صدر آلياً*\n✅ *تم التوثيق بنجاح*\n🌹 *شكراً لتعاملكم معنا*`;
             
             const waLink = `https://api.whatsapp.com/send?phone=${MY_WHATSAPP_NUMBER}&text=${encodeURIComponent(waMsg)}`;
             
@@ -157,7 +157,7 @@ async function handleBalanceQuery(chatId, shop) {
         const res = await axios.post(GOOGLE_SCRIPT_URL, `BALANCE_CHECK:${shop}`);
         if (res.data.includes("BAL_DATA")) {
             const p = res.data.split('|');
-            let balMsg = `*🧾 كشف حساب: ${shop}*\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n*🔴 عليكم:* ${Number(p[1]).toLocaleString()}\n*🟢 واصل:* ${Number(p[2]).toLocaleString()}\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n*💰 الصافي المطلوب:* ${Number(p[3]).toLocaleString()}`;
+            let balMsg = `*🧾 كشف حساب: ${shop}*\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n*🔴 عليكم:* ${Number(p[1]).toLocaleString()}\n*🟢 واصل:* ${Number(p[2]).toLocaleString()}\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n*💰 الصافي المطلوب:* ${Number(p[3]).toLocaleString()}\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n*🤖 صدر آلياً بتاريخ:* ${new Date().toLocaleDateString('en-GB')}`;
             
             bot.sendMessage(chatId, `📊 *تفاصيل الحساب لـ ${shop}*\n\nانقر للنسخ:\n\n\`${balMsg}\``, { parse_mode: 'Markdown' });
         }
@@ -170,7 +170,7 @@ async function handleTodayReport(chatId) {
         const res = await axios.post(GOOGLE_SCRIPT_URL, "GET_TODAY_REPORT");
         if (res.data.includes("TODAY_DATA")) {
             const p = res.data.split('|');
-            let todayMsg = `*📊 تقرير اليومية*\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n*💰 الإجمالي:* ${Number(p[1]).toLocaleString()}\n*✅ العمليات:* ${p[2]}\n\n*التفاصيل:*\n${p[3] || "لا يوجد عمليات"}`;
+            let todayMsg = `*📊 تقرير اليومية*\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n*💰 الإجمالي:* ${Number(p[1]).toLocaleString()}\n*✅ العمليات:* ${p[2]}\n\n*التفاصيل:*\n${p[3] || "لا يوجد عمليات"}\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n*🤖 تم الاستخراج آلياً*`;
             
             bot.sendMessage(chatId, `📑 *تقرير اليومية الإجمالي*\n\n\`${todayMsg}\``, { parse_mode: 'Markdown' });
         }

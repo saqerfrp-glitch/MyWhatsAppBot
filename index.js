@@ -6,14 +6,16 @@ const app = express();
 app.get('/', (req, res) => res.send('Bot is Running 🚀'));
 app.listen(process.env.PORT || 10000);
 
+// --- الإعدادات الأساسية ---
 const TELEGRAM_TOKEN = '8012907736:AAE2ebdQb7qKgDcAhToNU3xFqgO9vizr52E';
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbHmQP8g0rjxYSkkQJPEqkMN2cruAlQk_BN6y-rkb_Yi-Xr39RZw_XtVSg5fbEeEN89A/exec';
 const MY_WHATSAPP_NUMBER = "967775787199"; 
-const ADMIN_ID = 656096830; // ضع الـ ID الخاص بك
+const ADMIN_ID = 656096830; // ⚠️ ضع رقم ID الخاص بك هنا
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 let userState = {};
 
+// --- قائمة الأوامر ---
 bot.setMyCommands([
     { command: 'start', description: '🏠 الرئيسية' },
     { command: 'new', description: '➕ إضافة عملية/سداد' },
@@ -24,6 +26,7 @@ bot.setMyCommands([
 bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
+
     if (chatId !== ADMIN_ID || !text) return;
 
     if (text === '/start') {
@@ -42,10 +45,11 @@ bot.on('message', async (msg) => {
                 ]
             }
         };
-        bot.sendMessage(chatId, "🏬 اختر المحل:", keyboard);
+        bot.sendMessage(chatId, "🏬 اختر المحل المطلوب:", keyboard);
         return;
     }
 
+    // --- استقبال البيانات ومعالجتها ذكياً ---
     if (userState[chatId] && userState[chatId].waitingForData) {
         const { shop, type } = userState[chatId];
         let parts = text.trim().split(/\s+/);
@@ -57,26 +61,31 @@ bot.on('message', async (msg) => {
                 let process = parts.join(' '); 
                 processTransaction(chatId, `${shop}-${model}-${process}-${price}`);
                 delete userState[chatId];
-            } else { bot.sendMessage(chatId, "⚠️ أرسل: الموديل العملية السعر"); }
+            } else {
+                bot.sendMessage(chatId, "⚠️ خطأ! أرسل: الموديل العملية السعر (بفراغات)");
+            }
         } else if (type === 'lakum') {
             if (parts.length >= 2) {
                 let amount = parts.shift();
                 let note = parts.join(' ');
                 processTransaction(chatId, `${shop}-لكم-${amount}-${note}`);
                 delete userState[chatId];
-            } else { bot.sendMessage(chatId, "⚠️ أرسل: المبلغ البيان"); }
+            } else {
+                bot.sendMessage(chatId, "⚠️ خطأ! أرسل: المبلغ البيان (بفراغات)");
+            }
         }
         return;
     }
 
     if (text === '/balance') handleBalanceMenu(chatId);
     if (text === '/today') handleTodayReport(chatId);
-    if (text.includes('-')) processTransaction(chatId, text);
 });
 
 bot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
     const data = query.data;
+
+    // مرحلة اختيار المحل للتسجيل
     if (data.startsWith('select_')) {
         const shop = data.split('_')[1];
         const keyboard = {
@@ -89,14 +98,35 @@ bot.on('callback_query', async (query) => {
         };
         bot.editMessageText(`🏢 المحل: *${shop}*`, { chat_id: chatId, message_id: query.message.message_id, parse_mode: 'Markdown', reply_markup: keyboard.reply_markup });
     }
+
+    // مرحلة تحديد نوع البيانات
     if (data.startsWith('type_')) {
         const [, type, shop] = data.split('_');
         userState[chatId] = { waitingForData: true, shop: shop, type: type };
         bot.answerCallbackQuery(query.id);
-        const msg = (type === 'aliakum') ? `📝 سجل شغل لـ *${shop}*\nأرسل: (الموديل العملية السعر)\n_مثال: S21 تخطي حساب جوجل 5000_` : `💰 سجل واصل من *${shop}*\nأرسل: (المبلغ البيان)\n_مثال: 20000 سداد يدوي حساب قديم_`;
+        const msg = (type === 'aliakum') ? `📝 سجل لـ *${shop}*\nأرسل: (الموديل العملية السعر)` : `💰 سجل واصل من *${shop}*\nأرسل: (المبلغ البيان)`;
         bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
     }
-    if (data.startsWith('bal_')) handleBalanceQuery(chatId, data.split('_')[1], query.id);
+
+    // عرض كشف الحساب النصي
+    if (data.startsWith('bal_')) {
+        handleBalanceQuery(chatId, data.split('_')[1], query.id);
+    }
+
+    // ميزة الـ PDF الجديدة
+    if (data.startsWith('pdf_')) {
+        const shop = data.split('_')[1];
+        bot.sendMessage(chatId, `⏳ جاري إنشاء ملف PDF لـ *${shop}*...`, { parse_mode: 'Markdown' });
+        try {
+            const res = await axios.post(GOOGLE_SCRIPT_URL, `GENERATE_PDF:${shop}`);
+            if (res.data.includes("PDF_URL")) {
+                const pdfUrl = res.data.split('|')[1];
+                bot.sendMessage(chatId, `✅ تم تجهيز كشف PDF لـ *${shop}*`, {
+                    reply_markup: { inline_keyboard: [[{ text: '📂 فتح وتحميل الملف', url: pdfUrl }]] }
+                });
+            }
+        } catch (e) { bot.sendMessage(chatId, "❌ فشل إنشاء PDF."); }
+    }
 });
 
 async function processTransaction(chatId, text) {
@@ -114,14 +144,24 @@ async function processTransaction(chatId, text) {
         const res = await axios.post(GOOGLE_SCRIPT_URL, googleData);
         if (res.data.includes("Success")) {
             const waLink = `https://api.whatsapp.com/send?phone=${MY_WHATSAPP_NUMBER}&text=${encodeURIComponent(waMsg)}`;
-            bot.sendMessage(chatId, `✅ تم التسجيل لـ *${shop}*\n\n\`${waMsg}\``, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '📲 إرسال الإشعار للعميل', url: waLink }]] } });
+            bot.sendMessage(chatId, `✅ تم التسجيل بنجاح:\n\n\`${waMsg}\``, { 
+                parse_mode: 'Markdown', 
+                reply_markup: { inline_keyboard: [[{ text: '📲 إرسال للعميل (واتساب)', url: waLink }]] } 
+            });
         }
-    } catch (e) { bot.sendMessage(chatId, "❌ خطأ."); }
+    } catch (e) { bot.sendMessage(chatId, "❌ خطأ في جوجل."); }
 }
 
 function handleBalanceMenu(chatId) {
-    const keyboard = { reply_markup: { inline_keyboard: [[{ text: 'القمة للجوال', callback_data: 'bal_القمة للجوال' }, { text: 'زين فون', callback_data: 'bal_زين فون' }], [{ text: 'عدنان بايزيد', callback_data: 'bal_عدنان بايزيد' }, { text: 'المهندس', callback_data: 'bal_المهندس' }]] } };
-    bot.sendMessage(chatId, "💰 اختر المحل:", keyboard);
+    const keyboard = {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: 'القمة للجوال', callback_data: 'bal_القمة للجوال' }, { text: 'زين فون', callback_data: 'bal_زين فون' }],
+                [{ text: 'عدنان بايزيد', callback_data: 'bal_عدنان بايزيد' }, { text: 'المهندس', callback_data: 'bal_المهندس' }]
+            ]
+        }
+    };
+    bot.sendMessage(chatId, "💰 اختر المحل لعرض الرصيد:", keyboard);
 }
 
 async function handleBalanceQuery(chatId, shop, queryId) {
@@ -129,12 +169,17 @@ async function handleBalanceQuery(chatId, shop, queryId) {
     try {
         const res = await axios.post(GOOGLE_SCRIPT_URL, `BALANCE_CHECK:${shop}`);
         const p = res.data.split('|');
-        const msg = `🧾 *كشف حساب: ${shop}*\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n🔴 عليكم: ${Number(p[1]).toLocaleString()}\n🟢 واصل: ${Number(p[2]).toLocaleString()}\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n💵 *الصافي المطلوب:* ${Number(p[3]).toLocaleString()}\n\n🤖 *هذا الإشعار صدر آلياً*`;
-        bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
+        const msg = `🧾 *كشف حساب: ${shop}*\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n🔴 عليكم: ${Number(p[1]).toLocaleString()}\n🟢 واصل: ${Number(p[2]).toLocaleString()}\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n💵 *الصافي المطلوب:* ${Number(p[3]).toLocaleString()}`;
+        
+        bot.sendMessage(chatId, msg, {
+            parse_mode: 'Markdown',
+            reply_markup: { inline_keyboard: [[{ text: '📄 استخراج كشف PDF رسمي', callback_data: `pdf_${shop}` }]] }
+        });
     } catch (e) { bot.sendMessage(chatId, "❌ خطأ."); }
 }
 
 async function handleTodayReport(chatId) {
+    bot.sendMessage(chatId, "⏳ جاري تجميع اليومية...");
     try {
         const res = await axios.post(GOOGLE_SCRIPT_URL, "GET_TODAY_REPORT");
         const p = res.data.split('|');
@@ -142,4 +187,4 @@ async function handleTodayReport(chatId) {
     } catch (e) { bot.sendMessage(chatId, "❌ خطأ."); }
 }
 
-setInterval(() => { axios.get("https://mywhatsappbot-7jf2.onrender.com").catch(()=>{}); }, 5 * 60 * 1000);
+setInterval(() => { axios.get("https://mywhatsappbot-7jf2.onrender.

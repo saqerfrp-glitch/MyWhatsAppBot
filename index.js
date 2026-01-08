@@ -4,18 +4,19 @@ const express = require('express');
 
 const app = express();
 app.get('/', (req, res) => res.send('Bot is Running 🚀'));
-app.listen(process.env.PORT || 10000);
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
 
-// --- الإعدادات الأساسية ---
+// --- الإعدادات ---
 const TELEGRAM_TOKEN = '8012907736:AAE2ebdQb7qKgDcAhToNU3xFqgO9vizr52E';
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbHmQP8g0rjxYSkkQJPEqkMN2cruAlQk_BN6y-rkb_Yi-Xr39RZw_XtVSg5fbEeEN89A/exec';
 const MY_WHATSAPP_NUMBER = "967775787199"; 
-const ADMIN_ID = 656096830; // ⚠️ ضع رقم ID الخاص بك هنا
+const ADMIN_ID = 656096830; // ⚠️ استبدل هذا الرقم بـ ID حسابك
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 let userState = {};
 
-// --- قائمة الأوامر ---
+// --- الأوامر ---
 bot.setMyCommands([
     { command: 'start', description: '🏠 الرئيسية' },
     { command: 'new', description: '➕ إضافة عملية/سداد' },
@@ -30,10 +31,9 @@ bot.on('message', async (msg) => {
     if (chatId !== ADMIN_ID || !text) return;
 
     if (text === '/start') {
-        bot.sendMessage(chatId, "مرحباً بك في نظام الإدارة الذكي 🛠\nاختر من الأزرار لبدء العمل:", {
+        return bot.sendMessage(chatId, "مرحباً بك في نظام الإدارة الذكي 🛠\nاختر من الأزرار لبدء العمل:", {
             reply_markup: { keyboard: [['/new', '/balance'], ['/today']], resize_keyboard: true }
         });
-        return;
     }
 
     if (text === '/new') {
@@ -45,47 +45,39 @@ bot.on('message', async (msg) => {
                 ]
             }
         };
-        bot.sendMessage(chatId, "🏬 اختر المحل المطلوب:", keyboard);
-        return;
+        return bot.sendMessage(chatId, "🏬 اختر المحل المطلوب:", keyboard);
     }
 
-    // --- استقبال البيانات ومعالجتها ذكياً ---
     if (userState[chatId] && userState[chatId].waitingForData) {
         const { shop, type } = userState[chatId];
         let parts = text.trim().split(/\s+/);
         
-        if (type === 'aliakum') {
-            if (parts.length >= 3) {
-                let price = parts.pop(); 
-                let model = parts.shift();
-                let process = parts.join(' '); 
-                processTransaction(chatId, `${shop}-${model}-${process}-${price}`);
-                delete userState[chatId];
-            } else {
-                bot.sendMessage(chatId, "⚠️ خطأ! أرسل: الموديل العملية السعر (بفراغات)");
-            }
-        } else if (type === 'lakum') {
-            if (parts.length >= 2) {
-                let amount = parts.shift();
-                let note = parts.join(' ');
-                processTransaction(chatId, `${shop}-لكم-${amount}-${note}`);
-                delete userState[chatId];
-            } else {
-                bot.sendMessage(chatId, "⚠️ خطأ! أرسل: المبلغ البيان (بفراغات)");
-            }
+        if (type === 'aliakum' && parts.length >= 3) {
+            let price = parts.pop(); 
+            let model = parts.shift();
+            let process = parts.join(' '); 
+            processTransaction(chatId, `${shop}-${model}-${process}-${price}`);
+            delete userState[chatId];
+        } else if (type === 'lakum' && parts.length >= 2) {
+            let amount = parts.shift();
+            let note = parts.join(' ');
+            processTransaction(chatId, `${shop}-لكم-${amount}-${note}`);
+            delete userState[chatId];
+        } else {
+            bot.sendMessage(chatId, "⚠️ بيانات ناقصة! أرسل القيم مع فراغات.");
         }
         return;
     }
 
-    if (text === '/balance') handleBalanceMenu(chatId);
-    if (text === '/today') handleTodayReport(chatId);
+    if (text === '/balance') return handleBalanceMenu(chatId);
+    if (text === '/today') return handleTodayReport(chatId);
 });
 
 bot.on('callback_query', async (query) => {
     const chatId = query.message.chat.id;
     const data = query.data;
+    const messageId = query.message.message_id;
 
-    // مرحلة اختيار المحل للتسجيل
     if (data.startsWith('select_')) {
         const shop = data.split('_')[1];
         const keyboard = {
@@ -96,33 +88,33 @@ bot.on('callback_query', async (query) => {
                 ]
             }
         };
-        bot.editMessageText(`🏢 المحل: *${shop}*`, { chat_id: chatId, message_id: query.message.message_id, parse_mode: 'Markdown', reply_markup: keyboard.reply_markup });
+        return bot.editMessageText(`🏢 المحل: *${shop}*`, { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: keyboard.reply_markup });
     }
 
-    // مرحلة تحديد نوع البيانات
     if (data.startsWith('type_')) {
-        const [, type, shop] = data.split('_');
+        const parts = data.split('_');
+        const type = parts[1];
+        const shop = parts[2];
         userState[chatId] = { waitingForData: true, shop: shop, type: type };
         bot.answerCallbackQuery(query.id);
-        const msg = (type === 'aliakum') ? `📝 سجل لـ *${shop}*\nأرسل: (الموديل العملية السعر)` : `💰 سجل واصل من *${shop}*\nأرسل: (المبلغ البيان)`;
-        bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
+        const msg = (type === 'aliakum') ? `📝 سجل شغل لـ *${shop}*\nأرسل: (الموديل العملية السعر)` : `💰 سجل واصل من *${shop}*\nأرسل: (المبلغ البيان)`;
+        return bot.sendMessage(chatId, msg, { parse_mode: 'Markdown' });
     }
 
-    // عرض كشف الحساب النصي
     if (data.startsWith('bal_')) {
-        handleBalanceQuery(chatId, data.split('_')[1], query.id);
+        return handleBalanceQuery(chatId, data.split('_')[1], query.id);
     }
 
-    // ميزة الـ PDF الجديدة
     if (data.startsWith('pdf_')) {
         const shop = data.split('_')[1];
-        bot.sendMessage(chatId, `⏳ جاري إنشاء ملف PDF لـ *${shop}*...`, { parse_mode: 'Markdown' });
+        bot.answerCallbackQuery(query.id);
+        bot.sendMessage(chatId, `⏳ جاري إنشاء ملف PDF لـ *${shop}*...`);
         try {
             const res = await axios.post(GOOGLE_SCRIPT_URL, `GENERATE_PDF:${shop}`);
             if (res.data.includes("PDF_URL")) {
                 const pdfUrl = res.data.split('|')[1];
-                bot.sendMessage(chatId, `✅ تم تجهيز كشف PDF لـ *${shop}*`, {
-                    reply_markup: { inline_keyboard: [[{ text: '📂 فتح وتحميل الملف', url: pdfUrl }]] }
+                bot.sendMessage(chatId, `✅ كشف PDF جاهز لـ *${shop}*`, {
+                    reply_markup: { inline_keyboard: [[{ text: '📂 فتح الملف', url: pdfUrl }]] }
                 });
             }
         } catch (e) { bot.sendMessage(chatId, "❌ فشل إنشاء PDF."); }
@@ -131,7 +123,7 @@ bot.on('callback_query', async (query) => {
 
 async function processTransaction(chatId, text) {
     let parts = text.split('-');
-    let shop = parts[0].trim(), p2 = parts[1], p3 = parts[2], p4 = parts[3];
+    let shop = parts[0], p2 = parts[1], p3 = parts[2], p4 = parts[3];
     let isLakum = (p2 === "لكم");
     let googleData = isLakum ? `${shop}\nلكم عملية == ${p4}\nالسعر == ${p3}` : `${shop}\nالموديل = ${p2}\nالعملية = ${p3}\nعليكم = ${p4}`;
 
@@ -144,7 +136,7 @@ async function processTransaction(chatId, text) {
         const res = await axios.post(GOOGLE_SCRIPT_URL, googleData);
         if (res.data.includes("Success")) {
             const waLink = `https://api.whatsapp.com/send?phone=${MY_WHATSAPP_NUMBER}&text=${encodeURIComponent(waMsg)}`;
-            bot.sendMessage(chatId, `✅ تم التسجيل بنجاح:\n\n\`${waMsg}\``, { 
+            bot.sendMessage(chatId, `✅ تم التسجيل لـ *${shop}*\n\n\`${waMsg}\``, { 
                 parse_mode: 'Markdown', 
                 reply_markup: { inline_keyboard: [[{ text: '📲 إرسال للعميل (واتساب)', url: waLink }]] } 
             });
@@ -170,7 +162,6 @@ async function handleBalanceQuery(chatId, shop, queryId) {
         const res = await axios.post(GOOGLE_SCRIPT_URL, `BALANCE_CHECK:${shop}`);
         const p = res.data.split('|');
         const msg = `🧾 *كشف حساب: ${shop}*\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n🔴 عليكم: ${Number(p[1]).toLocaleString()}\n🟢 واصل: ${Number(p[2]).toLocaleString()}\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n💵 *الصافي المطلوب:* ${Number(p[3]).toLocaleString()}`;
-        
         bot.sendMessage(chatId, msg, {
             parse_mode: 'Markdown',
             reply_markup: { inline_keyboard: [[{ text: '📄 استخراج كشف PDF رسمي', callback_data: `pdf_${shop}` }]] }
@@ -179,7 +170,6 @@ async function handleBalanceQuery(chatId, shop, queryId) {
 }
 
 async function handleTodayReport(chatId) {
-    bot.sendMessage(chatId, "⏳ جاري تجميع اليومية...");
     try {
         const res = await axios.post(GOOGLE_SCRIPT_URL, "GET_TODAY_REPORT");
         const p = res.data.split('|');
@@ -187,4 +177,4 @@ async function handleTodayReport(chatId) {
     } catch (e) { bot.sendMessage(chatId, "❌ خطأ."); }
 }
 
-setInterval(() => { axios.get("https://mywhatsappbot-7jf2.onrender.
+setInterval(() => { axios.get(`https://${process.env.RENDER_EXTERNAL_HOSTNAME}`).catch(() => {}); }, 5 * 60 * 1000);
